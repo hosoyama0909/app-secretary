@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>新しいアプリ（雛形）</title>
-<meta name="description" content="バニラHTML/CSS/JSの最小スターター。localStorage保存の実演つき。">
+<title>秘書アプリ</title>
+<meta name="description" content="家庭の庶務（家計・家電・住宅・車・教育費・消耗品ほか）を台帳と期日ダッシュボードで一元管理。音声・会話・写真での下書き入力つき。">
 <style>
   /* ── デザインは家族アプリと統一の暖色系。シンプル志向・大きめタップ領域 ── */
   :root{
     --bg:#f4efe6; --card:#fffdf8; --ink:#2a2620; --sub:#6b6357;
-    --accent:#1b4332; --line:#e5ddcd;
+    --accent:#1b4332; --accent2:#2d6a4f; --line:#e5ddcd;
+    --warn:#b45309; --danger:#b91c1c;
   }
   *{box-sizing:border-box}
   html,body{margin:0}
@@ -17,65 +18,716 @@
     font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;
     background:var(--bg); color:var(--ink); line-height:1.6;
     -webkit-text-size-adjust:100%;
+    padding-bottom:76px;
   }
-  .wrap{max-width:560px; margin:0 auto; padding:28px 20px 48px}
-  h1{font-size:1.4rem; margin:0 0 4px}
-  .lead{color:var(--sub); margin:0 0 22px}
+  .wrap{max-width:640px; margin:0 auto; padding:20px 16px 40px}
+  h1{font-size:1.3rem; margin:0 0 2px}
+  h2{font-size:1.05rem; margin:18px 0 8px}
+  .lead{color:var(--sub); margin:0 0 18px; font-size:.92rem}
   .card{background:var(--card); border:1px solid var(--line);
-    border-radius:16px; padding:18px}
-  label{display:block; font-weight:700; margin:0 0 8px}
-  /* 入力・ボタンは高さ48px以上＝指で押しやすい */
-  input[type=text]{
-    width:100%; font-size:1.05rem; padding:12px 14px; min-height:48px;
+    border-radius:16px; padding:16px; margin-bottom:14px}
+  label{display:block; font-weight:700; margin:14px 0 6px; font-size:.92rem}
+  label:first-child{margin-top:0}
+  input[type=text],input[type=number],input[type=date],input[type=url],select,textarea{
+    width:100%; font-size:1.02rem; padding:12px 14px; min-height:48px;
     border:1px solid var(--line); border-radius:12px; background:#fff; color:var(--ink);
+    font-family:inherit;
   }
-  input:focus-visible{outline:3px solid var(--accent); outline-offset:1px}
+  textarea{min-height:80px; resize:vertical}
+  input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent); outline-offset:1px}
   .btn{
-    margin-top:12px; width:100%; min-height:48px; font-size:1.05rem; font-weight:700;
+    margin-top:12px; width:100%; min-height:48px; font-size:1.02rem; font-weight:700;
     color:#fff; background:var(--accent); border:0; border-radius:12px; cursor:pointer;
   }
-  .btn:active{opacity:.9}
-  .hint{color:var(--sub); font-size:.9rem; margin-top:14px}
+  .btn:active{opacity:.85}
+  .btn.secondary{background:#fff; color:var(--accent); border:1px solid var(--accent)}
+  .btn.ghost{background:transparent; color:var(--sub); border:1px dashed var(--line); font-weight:600}
+  .btn.danger{background:var(--danger)}
+  .btn.small{min-height:40px; font-size:.9rem; margin-top:8px; width:auto; padding:0 16px}
+  .row{display:flex; gap:8px}
+  .row .btn{flex:1}
+  .hint{color:var(--sub); font-size:.85rem; margin-top:10px}
   code{background:#efe8da; padding:1px 6px; border-radius:6px}
+
+  nav.tabs{
+    position:fixed; left:0; right:0; bottom:0; background:var(--card);
+    border-top:1px solid var(--line); display:flex; z-index:10;
+  }
+  nav.tabs button{
+    flex:1; min-height:64px; border:0; background:transparent; color:var(--sub);
+    font-size:.82rem; font-weight:700; cursor:pointer; padding:8px 4px;
+  }
+  nav.tabs button .ic{display:block; font-size:1.35rem; margin-bottom:2px}
+  nav.tabs button.active{color:var(--accent)}
+
+  .list-item{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:14px 4px; border-bottom:1px solid var(--line); cursor:pointer;
+    min-height:48px;
+  }
+  .list-item:last-child{border-bottom:0}
+  .list-item .meta{color:var(--sub); font-size:.85rem}
+  .cat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .cat-tile{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:14px; cursor:pointer; min-height:64px; display:flex; flex-direction:column; justify-content:center;
+  }
+  .cat-tile .ic{font-size:1.4rem}
+  .cat-tile .nm{font-weight:700; margin-top:4px}
+  .cat-tile .ct{color:var(--sub); font-size:.8rem}
+
+  .badge{display:inline-block; padding:3px 10px; border-radius:999px; font-size:.78rem; font-weight:700}
+  .badge.ok{background:#e7f3ec; color:var(--accent2)}
+  .badge.soon{background:#fdf0e0; color:var(--warn)}
+  .badge.overdue{background:#fbe6e6; color:var(--danger)}
+
+  .filterbar{display:flex; gap:8px; margin-bottom:14px}
+  .filterbar button{
+    flex:1; min-height:40px; border-radius:10px; border:1px solid var(--line);
+    background:#fff; color:var(--sub); font-weight:700; font-size:.85rem; cursor:pointer;
+  }
+  .filterbar button.active{background:var(--accent); color:#fff; border-color:var(--accent)}
+
+  .empty{color:var(--sub); text-align:center; padding:30px 10px; font-size:.92rem}
+
+  .dates-list .date-row{
+    display:flex; gap:8px; align-items:flex-start; border:1px solid var(--line);
+    border-radius:12px; padding:10px; margin-top:8px; flex-wrap:wrap;
+  }
+  .dates-list .date-row > *{flex:1 1 120px}
+  .date-row .rm{flex:0 0 auto; min-height:40px; padding:0 12px; border-radius:10px; border:1px solid var(--line); background:#fff; color:var(--danger); cursor:pointer}
+
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px}
+  .chip{
+    border:1px solid var(--line); background:#fff; border-radius:999px; padding:8px 14px;
+    font-size:.85rem; font-weight:700; color:var(--accent2); cursor:pointer; min-height:36px;
+  }
+
+  .ai-panel{background:#f4faf6; border:1px solid #cfe6d8; border-radius:14px; padding:14px; margin-top:16px}
+  .ai-panel .privacy{font-size:.8rem; color:var(--sub); margin-top:8px}
+  .ai-panel textarea{margin-top:8px}
+  .top-actions{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
+  .top-actions .back{background:transparent; border:0; color:var(--accent); font-weight:700; font-size:.95rem; cursor:pointer; padding:8px 0}
+  .top-actions .del{background:transparent; border:0; color:var(--danger); font-weight:700; font-size:.9rem; cursor:pointer}
+
+  .guardrail{background:#fdf1f1; border:1px solid #f3c9c9; border-radius:12px; padding:12px 14px; font-size:.85rem; color:#7a1f1f; margin-bottom:14px}
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>新しいアプリ（雛形）</h1>
-    <p class="lead">この1ファイルをコピーして中身を書き換えれば、新しいアプリが作れます。</p>
+  <div class="wrap" id="app"></div>
 
-    <div class="card">
-      <label for="name">お名前（例）</label>
-      <input id="name" type="text" placeholder="ここに入力すると自動で保存されます">
-      <button class="btn" id="clear" type="button">保存を消す</button>
-      <p class="hint">
-        入力内容はこの端末の中（<code>localStorage</code>）だけに保存されます。
-        サーバには送られません。個人データはこの方式で扱うのが本プロジェクトの方針です。
-      </p>
-    </div>
-  </div>
+  <nav class="tabs">
+    <button data-screen="due"><span class="ic">🔔</span>期日</button>
+    <button data-screen="ledger"><span class="ic">🗂️</span>台帳</button>
+    <button data-screen="settings"><span class="ic">⚙️</span>設定</button>
+  </nav>
 
-  <script>
-    // ── localStorage 保存の最小サンプル ──
-    // キーはアプリごとに一意にする（衝突防止）。新アプリでは名前を変える。
-    var KEY = 'template-vanilla-webapp:name';
-    var input = document.getElementById('name');
-    var clear = document.getElementById('clear');
+<script>
+(function(){
+'use strict';
 
-    // 起動時：保存済みの値を復元
-    input.value = localStorage.getItem(KEY) || '';
+// ── ストレージキー（アプリ間の衝突防止）──
+var K_CATS = 'app-secretary:categories';
+var K_ITEMS = 'app-secretary:items';
+var K_SETTINGS = 'app-secretary:settings';
 
-    // 入力するたびに保存（入力中も消えない）
-    input.addEventListener('input', function(){
-      localStorage.setItem(KEY, input.value);
+// ── プリセット17ドメイン ──
+// フィールド定義をデータとして持つ＝新ドメインは設定画面からカテゴリを足すだけで増やせる。
+var PRESET_CATEGORIES = [
+  {id:'kakei', name:'家計・資産', icon:'💰', dateHints:['更新日'], fields:[
+    {key:'name', label:'口座・資産名', type:'text'},
+    {key:'kind', label:'種類', type:'select', options:['普通預金','定期預金','証券','保険','その他']},
+    {key:'balance', label:'残高目安', type:'number', unit:'円'}
+  ]},
+  {id:'kaden', name:'家電', icon:'🔌', dateHints:['保証期限','手入れ日','買い替え目安'], fields:[
+    {key:'maker', label:'メーカー', type:'text'},
+    {key:'model', label:'型番', type:'text'},
+    {key:'buyDate', label:'購入日', type:'date'},
+    {key:'price', label:'購入価格', type:'number', unit:'円'}
+  ]},
+  {id:'jutaku', name:'住宅', icon:'🏠', dateHints:['固定資産税納期','火災保険更新'], fields:[
+    {key:'loanBalance', label:'ローン残高目安', type:'number', unit:'円'},
+    {key:'rateType', label:'金利タイプ', type:'select', options:['変動','固定']},
+    {key:'payDay', label:'返済日', type:'text'},
+    {key:'nearbyPrice', label:'近隣相場メモ', type:'text'}
+  ]},
+  {id:'kuruma', name:'車', icon:'🚗', dateHints:['車検満了日','自動車税','任意保険更新','タイヤ交換'], fields:[
+    {key:'model', label:'車種', type:'text'},
+    {key:'grade', label:'型式', type:'text'},
+    {key:'mileage', label:'走行距離', type:'number', unit:'km'}
+  ]},
+  {id:'kyouiku', name:'教育費', icon:'🎓', dateHints:['見直し時期'], fields:[
+    {key:'child', label:'対象の子', type:'text'},
+    {key:'method', label:'積立方法', type:'select', options:['学資保険','NISA','預金','その他']},
+    {key:'target', label:'目標額', type:'number', unit:'円'},
+    {key:'current', label:'現在額', type:'number', unit:'円'}
+  ]},
+  {id:'shoumouhin', name:'消耗品', icon:'🧻', dateHints:['次回購入目安'], fields:[
+    {key:'name', label:'品名', type:'text'},
+    {key:'shop', label:'安く買える場所', type:'text'},
+    {key:'price', label:'価格', type:'number', unit:'円'}
+  ]},
+  {id:'hoken', name:'保険', icon:'🛡️', dateHints:['更新日'], fields:[
+    {key:'kind', label:'種類', type:'select', options:['生命','医療','火災','自動車','その他']},
+    {key:'company', label:'保険会社', type:'text'},
+    {key:'monthly', label:'月額', type:'number', unit:'円'}
+  ]},
+  {id:'keiyaku', name:'契約・サブスク', icon:'📱', dateHints:['更新日','解約検討日'], fields:[
+    {key:'service', label:'サービス名', type:'text'},
+    {key:'monthly', label:'月額', type:'number', unit:'円'},
+    {key:'note', label:'解約検討ライン', type:'text'}
+  ]},
+  {id:'zeikin', name:'税金', icon:'🧾', dateHints:['納期'], fields:[
+    {key:'kind', label:'種類', type:'select', options:['固定資産税','自動車税','確定申告','ふるさと納税']},
+    {key:'amount', label:'金額目安', type:'number', unit:'円'}
+  ]},
+  {id:'shomeisho', name:'証明書・書類', icon:'🪪', dateHints:['更新期限'], fields:[
+    {key:'kind', label:'種類', type:'select', options:['運転免許','パスポート','マイナンバーカード','その他']}
+  ]},
+  {id:'kenkou', name:'健康・医療', icon:'🏥', dateHints:['次回予定'], fields:[
+    {key:'person', label:'対象者', type:'text'},
+    {key:'kind', label:'種類', type:'select', options:['予防接種','健診','常備薬','かかりつけ医']}
+  ]},
+  {id:'gakkou', name:'学校・保育園', icon:'🎒', dateHints:['提出期限','行事日'], fields:[
+    {key:'child', label:'対象の子', type:'text'},
+    {key:'item', label:'項目', type:'text'}
+  ]},
+  {id:'kisetsu', name:'季節タスク', icon:'🍂', dateHints:['次回実施日'], fields:[
+    {key:'task', label:'タスク名', type:'text'},
+    {key:'place', label:'場所', type:'text'}
+  ]},
+  {id:'bousai', name:'防災備蓄', icon:'🎒', dateHints:['消費期限'], fields:[
+    {key:'name', label:'品名', type:'text'},
+    {key:'qty', label:'数量', type:'text'}
+  ]},
+  {id:'kankon', name:'冠婚葬祭・贈答', icon:'🎁', dateHints:['お返し期限'], fields:[
+    {key:'person', label:'相手', type:'text'},
+    {key:'content', label:'内容', type:'text'},
+    {key:'amount', label:'金額', type:'number', unit:'円'}
+  ]},
+  {id:'point', name:'ポイント・クーポン', icon:'🎫', dateHints:['失効日'], fields:[
+    {key:'service', label:'サービス名', type:'text'},
+    {key:'balance', label:'残高', type:'text'}
+  ]},
+  {id:'jikka', name:'実家・親族', icon:'👨‍👩‍👧', dateHints:['対応期限'], fields:[
+    {key:'person', label:'相手', type:'text'},
+    {key:'todo', label:'やること', type:'text'}
+  ]}
+];
+
+// ── ストレージ ──
+function loadJSON(key, fallback){
+  try{
+    var raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  }catch(e){ return fallback; }
+}
+function saveJSON(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+var categories = loadJSON(K_CATS, null);
+if(!categories){
+  categories = PRESET_CATEGORIES.map(function(c, i){ c.order = i; return c; });
+  saveJSON(K_CATS, categories);
+}
+var items = loadJSON(K_ITEMS, []);
+var settings = loadJSON(K_SETTINGS, {workerUrl:''});
+
+function persistCategories(){ saveJSON(K_CATS, categories); }
+function persistItems(){ saveJSON(K_ITEMS, items); }
+function persistSettings(){ saveJSON(K_SETTINGS, settings); }
+
+function getCategory(id){
+  for(var i=0;i<categories.length;i++){ if(categories[i].id===id) return categories[i]; }
+  return null;
+}
+
+// ── 期日エンジン: once(単発) / yearly(毎年) / interval(nヶ月ごと) ──
+function pad2(n){ return (n<10?'0':'')+n; }
+function toISO(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function parseISO(s){
+  var p = s.split('-').map(Number);
+  return new Date(p[0], p[1]-1, p[2]);
+}
+function startOfToday(){ var d=new Date(); d.setHours(0,0,0,0); return d; }
+
+function computeNextDate(dateEntry, today){
+  today = today || startOfToday();
+  if(!dateEntry.date) return null;
+  var base = parseISO(dateEntry.date);
+  if(dateEntry.mode === 'once'){
+    return base;
+  }
+  if(dateEntry.mode === 'yearly'){
+    var next = new Date(today.getFullYear(), base.getMonth(), base.getDate());
+    if(next < today) next = new Date(today.getFullYear()+1, base.getMonth(), base.getDate());
+    return next;
+  }
+  if(dateEntry.mode === 'interval'){
+    var months = Math.max(1, parseInt(dateEntry.intervalMonths,10) || 1);
+    var cursor = new Date(base.getTime());
+    // baseから今日以降になるまでnヶ月ずつ進める
+    var guard = 0;
+    while(cursor < today && guard < 2000){
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth()+months, cursor.getDate());
+      guard++;
+    }
+    return cursor;
+  }
+  return base;
+}
+
+function daysBetween(a,b){
+  return Math.round((b - a) / (1000*60*60*24));
+}
+
+// ── 画面ルーティング ──
+var state = { screen:'due', filter:'3m', categoryId:null, itemId:null, editingCategoryId:null };
+
+var app = document.getElementById('app');
+var tabButtons = document.querySelectorAll('nav.tabs button');
+tabButtons.forEach(function(btn){
+  btn.addEventListener('click', function(){
+    state.screen = btn.getAttribute('data-screen');
+    state.categoryId = null; state.itemId = null;
+    render();
+  });
+});
+
+function setActiveTab(){
+  tabButtons.forEach(function(btn){
+    btn.classList.toggle('active', btn.getAttribute('data-screen') === state.screen);
+  });
+}
+
+function el(tag, attrs, children){
+  var e = document.createElement(tag);
+  attrs = attrs || {};
+  Object.keys(attrs).forEach(function(k){
+    if(k === 'class') e.className = attrs[k];
+    else if(k === 'html') e.innerHTML = attrs[k];
+    else if(k.indexOf('on') === 0) e.addEventListener(k.slice(2), attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  });
+  (children||[]).forEach(function(c){
+    if(c==null) return;
+    e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  });
+  return e;
+}
+
+function render(){
+  setActiveTab();
+  app.innerHTML = '';
+  if(state.screen === 'due') renderDue();
+  else if(state.screen === 'ledger') renderLedger();
+  else if(state.screen === 'settings') renderSettings();
+}
+
+// ── 🔔 期日ダッシュボード ──
+function renderDue(){
+  app.appendChild(el('h1', {}, ['🔔 期日']));
+  app.appendChild(el('p', {class:'lead'}, ['家中の期日を横断でチェック。近い順に並びます。']));
+
+  var filterbar = el('div', {class:'filterbar'});
+  [['1m','今月'],['3m','3ヶ月'],['all','すべて']].forEach(function(pair){
+    var b = el('button', {onclick:function(){ state.filter = pair[0]; render(); }}, [pair[1]]);
+    if(state.filter === pair[0]) b.classList.add('active');
+    filterbar.appendChild(b);
+  });
+  app.appendChild(filterbar);
+
+  var today = startOfToday();
+  var rows = [];
+  items.forEach(function(item){
+    var cat = getCategory(item.categoryId);
+    if(!cat) return;
+    (item.dates||[]).forEach(function(de){
+      var next = computeNextDate(de, today);
+      if(!next) return;
+      rows.push({item:item, cat:cat, dateEntry:de, next:next});
     });
+  });
+  rows.sort(function(a,b){ return a.next - b.next; });
 
-    // 保存を消す
-    clear.addEventListener('click', function(){
-      localStorage.removeItem(KEY);
-      input.value = '';
-      input.focus();
+  var limit = state.filter === '1m' ? 31 : (state.filter === '3m' ? 92 : Infinity);
+  rows = rows.filter(function(r){ return daysBetween(today, r.next) <= limit; });
+
+  var card = el('div', {class:'card'});
+  if(rows.length === 0){
+    card.appendChild(el('p', {class:'empty'}, ['この期間に期日はありません。']));
+  } else {
+    rows.forEach(function(r){
+      var d = daysBetween(today, r.next);
+      var lead = r.dateEntry.leadDays ? parseInt(r.dateEntry.leadDays,10) : 30;
+      var badgeClass = d < 0 ? 'overdue' : (d <= lead ? 'soon' : 'ok');
+      var label = d < 0 ? ('期限切れ ' + Math.abs(d) + '日') : ('あと' + d + '日');
+      var title = r.cat.icon + ' ' + (itemTitle(r.item, r.cat)) + ' ・ ' + r.dateEntry.label;
+      var row = el('div', {class:'list-item', onclick:function(){
+        state.screen='ledger'; state.categoryId = r.cat.id; state.itemId = r.item.id; render();
+      }}, [
+        el('div', {}, [
+          el('div', {}, [title]),
+          el('div', {class:'meta'}, [toISO(r.next)])
+        ]),
+        el('span', {class:'badge ' + badgeClass}, [label])
+      ]);
+      card.appendChild(row);
     });
-  </script>
+  }
+  app.appendChild(card);
+}
+
+function itemTitle(item, cat){
+  var f = cat.fields[0];
+  var v = f && item.values ? item.values[f.key] : '';
+  return v || '(無題)';
+}
+
+// ── 🗂️ 台帳 ──
+function renderLedger(){
+  if(state.itemId){ renderItemEdit(); return; }
+  if(state.categoryId){ renderCategoryItems(); return; }
+
+  app.appendChild(el('h1', {}, ['🗂️ 台帳']));
+  app.appendChild(el('p', {class:'lead'}, ['カテゴリを選んで記録・確認します。']));
+
+  var grid = el('div', {class:'cat-grid'});
+  categories.slice().sort(function(a,b){ return a.order-b.order; }).forEach(function(cat){
+    var count = items.filter(function(it){ return it.categoryId === cat.id; }).length;
+    grid.appendChild(el('div', {class:'cat-tile', onclick:function(){ state.categoryId = cat.id; render(); }}, [
+      el('div', {class:'ic'}, [cat.icon]),
+      el('div', {class:'nm'}, [cat.name]),
+      el('div', {class:'ct'}, [count + '件']),
+    ]));
+  });
+  app.appendChild(grid);
+}
+
+function renderCategoryItems(){
+  var cat = getCategory(state.categoryId);
+  if(!cat){ state.categoryId = null; render(); return; }
+
+  app.appendChild(el('div', {class:'top-actions'}, [
+    el('button', {class:'back', onclick:function(){ state.categoryId = null; render(); }}, ['← 台帳']),
+  ]));
+  app.appendChild(el('h1', {}, [cat.icon + ' ' + cat.name]));
+
+  var catItems = items.filter(function(it){ return it.categoryId === cat.id; });
+  var card = el('div', {class:'card'});
+  if(catItems.length === 0){
+    card.appendChild(el('p', {class:'empty'}, ['まだ記録がありません。']));
+  } else {
+    catItems.forEach(function(item){
+      card.appendChild(el('div', {class:'list-item', onclick:function(){ state.itemId = item.id; render(); }}, [
+        el('div', {}, [itemTitle(item, cat)]),
+        el('span', {class:'meta'}, ['›'])
+      ]));
+    });
+  }
+  app.appendChild(card);
+
+  app.appendChild(el('button', {class:'btn', onclick:function(){
+    var item = { id: uid(), categoryId: cat.id, values:{}, dates:[], memo:'', createdAt: new Date().toISOString() };
+    items.push(item); persistItems();
+    state.itemId = item.id; render();
+  }}, ['＋ 新しく記録する']));
+}
+
+function renderItemEdit(){
+  var cat = getCategory(state.categoryId);
+  var item = items.filter(function(it){ return it.id === state.itemId; })[0];
+  if(!cat || !item){ state.itemId = null; render(); return; }
+
+  app.appendChild(el('div', {class:'top-actions'}, [
+    el('button', {class:'back', onclick:function(){ state.itemId = null; render(); }}, ['← ' + cat.name]),
+    el('button', {class:'del', onclick:function(){
+      if(!confirm('この記録を削除しますか？')) return;
+      items = items.filter(function(it){ return it.id !== item.id; });
+      persistItems();
+      state.itemId = null; render();
+    }}, ['削除']),
+  ]));
+  app.appendChild(el('h1', {}, [cat.icon + ' ' + cat.name]));
+
+  var card = el('div', {class:'card'});
+
+  cat.fields.forEach(function(f){
+    card.appendChild(el('label', {for:'f-'+f.key}, [f.label + (f.unit ? '（'+f.unit+'）' : '')]));
+    var inputEl;
+    if(f.type === 'select'){
+      inputEl = el('select', {id:'f-'+f.key});
+      inputEl.appendChild(el('option', {value:''}, ['選択してください']));
+      (f.options||[]).forEach(function(opt){
+        var o = el('option', {value:opt}, [opt]);
+        if(item.values[f.key] === opt) o.selected = true;
+        inputEl.appendChild(o);
+      });
+    } else {
+      inputEl = el('input', {id:'f-'+f.key, type: f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : 'text')});
+      inputEl.value = item.values[f.key] || '';
+    }
+    inputEl.addEventListener('input', function(){ item.values[f.key] = inputEl.value; persistItems(); });
+    card.appendChild(inputEl);
+  });
+
+  // 期日
+  card.appendChild(el('h2', {}, ['期日']));
+  var chips = el('div', {class:'chips'});
+  (cat.dateHints||[]).forEach(function(hint){
+    chips.appendChild(el('button', {class:'chip', type:'button', onclick:function(){
+      item.dates.push({label:hint, mode:'once', date:toISO(new Date()), intervalMonths:12, leadDays:30});
+      persistItems(); render();
+    }}, ['＋ ' + hint]));
+  });
+  card.appendChild(chips);
+
+  var datesList = el('div', {class:'dates-list'});
+  item.dates.forEach(function(de, idx){
+    var labelInput = el('input', {type:'text', placeholder:'ラベル'});
+    labelInput.value = de.label;
+    labelInput.addEventListener('input', function(){ de.label = labelInput.value; persistItems(); });
+
+    var modeSelect = el('select');
+    [['once','単発'],['yearly','毎年'],['interval','◯ヶ月ごと']].forEach(function(p){
+      var o = el('option', {value:p[0]}, [p[1]]);
+      if(de.mode === p[0]) o.selected = true;
+      modeSelect.appendChild(o);
+    });
+    modeSelect.addEventListener('change', function(){ de.mode = modeSelect.value; persistItems(); render(); });
+
+    var dateInput = el('input', {type:'date'});
+    dateInput.value = de.date || '';
+    dateInput.addEventListener('input', function(){ de.date = dateInput.value; persistItems(); });
+
+    var row = el('div', {class:'date-row'}, [labelInput, modeSelect, dateInput]);
+
+    if(de.mode === 'interval'){
+      var intervalInput = el('input', {type:'number', placeholder:'ヶ月ごと'});
+      intervalInput.value = de.intervalMonths || 12;
+      intervalInput.addEventListener('input', function(){ de.intervalMonths = intervalInput.value; persistItems(); });
+      row.appendChild(intervalInput);
+    }
+
+    var rm = el('button', {class:'rm', type:'button', onclick:function(){
+      item.dates.splice(idx,1); persistItems(); render();
+    }}, ['削除']);
+    row.appendChild(rm);
+
+    datesList.appendChild(row);
+  });
+  card.appendChild(datesList);
+  card.appendChild(el('button', {class:'btn ghost small', type:'button', onclick:function(){
+    item.dates.push({label:'', mode:'once', date:toISO(new Date()), intervalMonths:12, leadDays:30});
+    persistItems(); render();
+  }}, ['＋ 期日を追加']));
+
+  // メモ
+  card.appendChild(el('label', {for:'memo'}, ['メモ（どこで買うと安い、等）']));
+  var memo = el('textarea', {id:'memo'});
+  memo.value = item.memo || '';
+  memo.addEventListener('input', function(){ item.memo = memo.value; persistItems(); });
+  card.appendChild(memo);
+
+  app.appendChild(card);
+
+  app.appendChild(renderAiPanel(cat, item));
+}
+
+// ── AI下書き入力（音声 / 会話テキスト / 写真OCR）──
+function renderAiPanel(cat, item){
+  var panel = el('div', {class:'ai-panel'});
+  panel.appendChild(el('h2', {html:'✨ 楽な入力（下書き）'}));
+
+  if(!settings.workerUrl){
+    panel.appendChild(el('p', {class:'hint'}, ['AI下書きを使うには、設定画面で Worker URL を登録してください。']));
+    return panel;
+  }
+
+  var textarea = el('textarea', {placeholder:'例）冷蔵庫、パナソニックの、去年の3月にヤマダで18万、保証5年'});
+  var status = el('p', {class:'hint'}, ['']);
+
+  var micBtn = el('button', {class:'btn secondary small', type:'button'}, ['🎤 音声で話す']);
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    micBtn.disabled = true;
+    micBtn.title = 'このブラウザは音声入力に対応していません';
+  } else {
+    micBtn.addEventListener('click', function(){
+      var recognition = new SR();
+      recognition.lang = 'ja-JP';
+      recognition.onresult = function(ev){
+        var text = ev.results[0][0].transcript;
+        textarea.value = (textarea.value ? textarea.value + ' ' : '') + text;
+      };
+      recognition.onerror = function(){ status.textContent = '音声認識でエラーが発生しました。'; };
+      status.textContent = '話しかけてください…';
+      recognition.start();
+    });
+  }
+
+  var draftBtn = el('button', {class:'btn secondary small', type:'button'}, ['📝 下書きを作成']);
+  draftBtn.addEventListener('click', function(){
+    if(!textarea.value.trim()){ status.textContent = '文章を入力または音声で話してください。'; return; }
+    status.textContent = '下書きを作成中…';
+    requestExtract({ mode:'extract', fields: cat.fields, text: textarea.value })
+      .then(function(draft){ applyDraft(item, cat, draft); status.textContent = '下書きを反映しました。内容を確認して保存してください。'; render(); })
+      .catch(function(err){ status.textContent = '抽出に失敗しました: ' + err.message; });
+  });
+
+  var photoInput = el('input', {type:'file', accept:'image/*', capture:'environment', style:'display:none'});
+  var photoBtn = el('button', {class:'btn secondary small', type:'button'}, ['📷 写真から下書き']);
+  photoBtn.addEventListener('click', function(){ photoInput.click(); });
+  photoInput.addEventListener('change', function(){
+    var file = photoInput.files[0];
+    if(!file) return;
+    status.textContent = '画像を読み取り中…';
+    var reader = new FileReader();
+    reader.onload = function(){
+      var base64 = reader.result.split(',')[1];
+      requestExtract({ mode:'extract-image', fields: cat.fields, imageBase64: base64, mimeType: file.type })
+        .then(function(draft){
+          applyDraft(item, cat, draft);
+          status.textContent = '写真から下書きを反映しました（画像自体は保存していません）。内容を確認して保存してください。';
+          render();
+        })
+        .catch(function(err){ status.textContent = '読み取りに失敗しました: ' + err.message; })
+        .finally(function(){ photoInput.value = ''; });
+    };
+    reader.readAsDataURL(file);
+  });
+
+  var row = el('div', {class:'row'}, [micBtn, photoBtn]);
+
+  panel.appendChild(textarea);
+  panel.appendChild(row);
+  panel.appendChild(draftBtn);
+  panel.appendChild(photoInput);
+  panel.appendChild(status);
+  panel.appendChild(el('p', {class:'privacy'}, [
+    '音声・テキスト・画像は下書き作成のため外部AI（Gemini）に送信されます。写真そのものは保存されません（抽出後に破棄）。',
+    el('br'),
+    '🔴 口座番号・暗証番号・カード番号・マイナンバー・パスワードは入力しないでください。'
+  ]));
+  return panel;
+}
+
+function applyDraft(item, cat, draft){
+  if(!draft || typeof draft !== 'object') return;
+  cat.fields.forEach(function(f){
+    if(draft[f.key] != null && draft[f.key] !== '') item.values[f.key] = draft[f.key];
+  });
+  if(Array.isArray(draft.dates)){
+    draft.dates.forEach(function(d){
+      if(d && d.label && d.date) item.dates.push({label:d.label, mode: d.mode || 'once', date: d.date, intervalMonths: d.intervalMonths || 12, leadDays: 30});
+    });
+  }
+  if(draft.memo){ item.memo = (item.memo ? item.memo + '\n' : '') + draft.memo; }
+  persistItems();
+}
+
+function requestExtract(payload){
+  payload.settings = { fieldsSchema:true };
+  return fetch(settings.workerUrl, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  }).then(function(res){
+    if(!res.ok) throw new Error('サーバエラー (' + res.status + ')');
+    return res.json();
+  });
+}
+
+// ── ⚙️ 設定 ──
+function renderSettings(){
+  app.appendChild(el('h1', {}, ['⚙️ 設定']));
+
+  app.appendChild(el('div', {class:'guardrail'}, [
+    '🔴 口座番号フル・暗証番号・カード番号/CVV・マイナンバー・パスワード・本人確認書類の画像は、このアプリにも入力しないでください。パスワード管理アプリ側で管理してください。'
+  ]));
+
+  var aiCard = el('div', {class:'card'});
+  aiCard.appendChild(el('h2', {}, ['AI下書き（Worker URL）']));
+  var urlInput = el('input', {type:'url', placeholder:'https://xxxx.workers.dev'});
+  urlInput.value = settings.workerUrl || '';
+  urlInput.addEventListener('change', function(){ settings.workerUrl = urlInput.value.trim(); persistSettings(); });
+  aiCard.appendChild(urlInput);
+  aiCard.appendChild(el('p', {class:'hint'}, ['家庭内で1つ、Cloudflare Worker（Gemini中継）を立てて、そのURLをここに登録します。画像/テキストはこのURL経由でのみ外部送信されます。']));
+  app.appendChild(aiCard);
+
+  var catCard = el('div', {class:'card'});
+  catCard.appendChild(el('h2', {}, ['カテゴリ管理']));
+  categories.slice().sort(function(a,b){return a.order-b.order;}).forEach(function(cat){
+    catCard.appendChild(el('div', {class:'list-item'}, [
+      el('div', {}, [cat.icon + ' ' + cat.name + ' (' + cat.fields.length + '項目)']),
+    ]));
+  });
+  catCard.appendChild(el('button', {class:'btn secondary', type:'button', onclick:addCategoryFlow}, ['＋ 新しいカテゴリを追加']));
+  app.appendChild(catCard);
+
+  var dataCard = el('div', {class:'card'});
+  dataCard.appendChild(el('h2', {}, ['データの入出力']));
+  dataCard.appendChild(el('button', {class:'btn secondary', type:'button', onclick:exportData}, ['エクスポート（JSON）']));
+  var importInput = el('input', {type:'file', accept:'application/json', style:'display:none'});
+  importInput.addEventListener('change', function(){
+    var file = importInput.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try{
+        var data = JSON.parse(reader.result);
+        if(data.categories) categories = data.categories;
+        if(data.items) items = data.items;
+        persistCategories(); persistItems();
+        alert('取り込みました。');
+        render();
+      }catch(e){ alert('JSONの読み込みに失敗しました。'); }
+    };
+    reader.readAsText(file);
+  });
+  dataCard.appendChild(el('button', {class:'btn secondary', type:'button', onclick:function(){ importInput.click(); }}, ['インポート（JSON）']));
+  dataCard.appendChild(importInput);
+  dataCard.appendChild(el('button', {class:'btn danger', type:'button', onclick:function(){
+    if(!confirm('すべてのデータを消去します。よろしいですか？')) return;
+    items = []; categories = PRESET_CATEGORIES.map(function(c,i){ c.order=i; return c; });
+    persistItems(); persistCategories();
+    render();
+  }}, ['全データを消去']));
+  app.appendChild(dataCard);
+
+  app.appendChild(el('p', {class:'hint'}, ['実データは端末内（localStorage）にのみ保存されます。家族への共有はJSONエクスポート/インポートで行います。']));
+}
+
+function addCategoryFlow(){
+  var name = prompt('カテゴリ名を入力してください（例：ペット）');
+  if(!name) return;
+  var icon = prompt('アイコン（絵文字1つ、例：🐾）', '📋') || '📋';
+  categories.push({ id: uid(), name: name, icon: icon, order: categories.length, dateHints:[], fields:[
+    {key:'name', label:'名前', type:'text'}
+  ]});
+  persistCategories();
+  render();
+}
+
+function exportData(){
+  var data = { categories: categories, items: items, exportedAt: new Date().toISOString() };
+  var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'secretary-export-' + toISO(new Date()) + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── expose for smoke test ──
+window.__secretaryApp = {
+  state: state, categories: categories, items: items, settings: settings,
+  computeNextDate: computeNextDate, render: render, getCategory: getCategory
+};
+
+render();
+})();
+</script>
 </body>
 </html>
