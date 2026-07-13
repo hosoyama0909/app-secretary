@@ -661,8 +661,15 @@ function requestExtract(payload){
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(payload)
   }).then(function(res){
-    if(!res.ok) throw new Error('サーバエラー (' + res.status + ')');
-    return res.json();
+    // 失敗時は本文（Worker が返す {"error": ...}）まで読んで、原因が画面で分かるようにする
+    return res.text().then(function(body){
+      if(!res.ok){
+        var detail = body;
+        try { var j = JSON.parse(body); if(j && j.error) detail = j.error; } catch(e){}
+        throw new Error('[' + res.status + '] ' + (detail || '不明なエラー'));
+      }
+      return JSON.parse(body);
+    });
   });
 }
 
