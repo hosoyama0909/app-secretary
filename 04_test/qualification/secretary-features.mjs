@@ -1,13 +1,14 @@
 /*
- * SWE.6 適格性確認テスト — 秘書アプリ（Rev 1 台帳/期日/入出力 ＋ Rev 2 AI下書き）
+ * SWE.6 適格性確認テスト — 秘書アプリ（Rev 1 台帳/期日/入出力 ＋ Rev 2 AI下書き ＋ Rev 3 日記）
  * 対応: QTC-LEDGER-01/02, QTC-DUE-01/02/03, QTC-CAT-01, QTC-DATA-01,
- *       QTC-AI-01/02/03, QTC-GUARD-01, QTC-NO-ERRORS ／ UTC-DUE-01/02/03/04
+ *       QTC-AI-01/02/03, QTC-GUARD-01, QTC-JOURNAL-01/02, QTC-TL-01/02,
+ *       QTC-DATA-02, QTC-NO-ERRORS ／ UTC-DUE-01/02/03/04
  * 実行: 04_test/README.md 参照。Worker/Gemini は外部依存のため fetch をモックする。
  */
 import { chromium } from 'playwright-core';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync } from 'fs';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const APP = 'file://' + resolve(__dir, '../../03_implementation/index.html');
@@ -111,6 +112,40 @@ await page.waitForTimeout(200);
 await page.click('nav.tabs button[data-screen="ledger"]'); await page.waitForTimeout(120);
 check('QTC-AI-03', (await page.$$('.cat-tile')).length >= 17, '502でも台帳は表示継続');
 
+// ── Rev 3: 日記・俯瞰タイムライン ──
+// QTC-JOURNAL-01: クイック記録でエントリを作成
+await page.click('nav.tabs button[data-screen="journal"]');
+await page.waitForTimeout(150);
+await page.locator('#app textarea').first().fill('保育園の面談に行った');
+await page.locator('input[placeholder*="タグ"]').fill('面談, 保育園');
+await page.click('button:has-text("記録する")');
+await page.waitForTimeout(150);
+const jrnl = await page.evaluate(() => JSON.parse(localStorage.getItem('app-secretary:journal') || '[]'));
+check('QTC-JOURNAL-01', jrnl.length === 1 && /面談/.test(jrnl[0].text) && jrnl[0].tags.includes('面談'),
+  'entry=' + jrnl.length + ' tags=' + (jrnl[0] ? jrnl[0].tags.join('/') : ''));
+
+// QTC-TL-01: 俯瞰タイムラインが日記＋期日を混在表示（家電の保証期限=今日 が出る）
+const tlEntry = (await page.$$('.tl-entry')).length;
+const tlDue = (await page.$$('.tl-due')).length;
+check('QTC-TL-01', tlEntry >= 1 && tlDue >= 1, '日記=' + tlEntry + ' 期日=' + tlDue);
+
+// QTC-TL-02: タグで絞り込むと日記だけに集中（期日は非表示）
+await page.click('.tag-pill.filter:has-text("面談")');
+await page.waitForTimeout(120);
+check('QTC-TL-02', (await page.$$('.tl-due')).length === 0 && (await page.$$('.tl-entry')).length >= 1,
+  '絞り込み後 期日=' + (await page.$$('.tl-due')).length + ' 日記=' + (await page.$$('.tl-entry')).length);
+await page.click('.tag-pill.filter.active'); // 絞り込み解除
+await page.waitForTimeout(120);
+
+// QTC-JOURNAL-02: エントリを開いて本文編集
+await page.locator('.tl-entry').first().click();
+await page.waitForTimeout(120);
+await page.locator('#app textarea').first().fill('保育園の面談：進級の話');
+await page.waitForTimeout(120);
+const jrnl2 = await page.evaluate(() => JSON.parse(localStorage.getItem('app-secretary:journal') || '[]'));
+check('QTC-JOURNAL-02', /進級/.test(jrnl2[0].text), '編集後=' + (jrnl2[0] ? jrnl2[0].text : ''));
+await page.click('.top-actions .back'); await page.waitForTimeout(100);
+
 // QTC-DUE-01 / QTC-DUE-03: 期日ダッシュボード
 await page.click('nav.tabs button[data-screen="due"]');
 await page.click('.filterbar button:has-text("すべて")');
@@ -137,6 +172,18 @@ const [download] = await Promise.all([
   page.click('button:has-text("エクスポート")'),
 ]);
 check('QTC-DATA-01', !!download, 'download=' + (download ? download.suggestedFilename() : 'なし'));
+
+// QTC-DATA-02: エクスポートJSONに journal が含まれる ＋ リロードで日記が保持される
+let exportedHasJournal = false;
+try {
+  const p = await download.path();
+  const data = JSON.parse(readFileSync(p, 'utf8'));
+  exportedHasJournal = Array.isArray(data.journal) && data.journal.length >= 1;
+} catch (e) { /* noop */ }
+await page.reload(); await page.waitForTimeout(300);
+const jrnlAfter = await page.evaluate(() => JSON.parse(localStorage.getItem('app-secretary:journal') || '[]'));
+check('QTC-DATA-02', exportedHasJournal && jrnlAfter.length >= 1,
+  'export.journal=' + exportedHasJournal + ' reload保持=' + jrnlAfter.length);
 
 check('QTC-NO-ERRORS', errors.length === 0, errors.join(' | ') || 'コンソールエラー無し');
 

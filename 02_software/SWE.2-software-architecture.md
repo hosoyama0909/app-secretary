@@ -45,13 +45,14 @@
 
 | コンポーネント | 責務 | 主なI/F | 割当 SWR |
 |----------------|------|---------|----------|
-| DataStore | 状態保持・永続化・共通ユーティリティ | `categories`,`items`,`settings`, `loadJSON/saveJSON`, `persistCategories/Items/Settings`, `uid()`, `getCategory(id)` | SWR-DATA-01, SWR-CAT-01 |
+| DataStore | 状態保持・永続化・共通ユーティリティ | `categories`,`items`,`settings`,`journal`, `loadJSON/saveJSON`, `persistCategories/Items/Settings/Journal`, `uid()`, `getCategory(id)` | SWR-DATA-01,04, SWR-CAT-01 |
 | PresetCatalog | プリセット17ドメインの定義 | `PRESET_CATEGORIES` | SWR-CAT-02,05 |
 | DueEngine | 期日の次回日算出・日数計算 | `computeNextDate(entry,today)`, `daysBetween`, `toISO/parseISO/startOfToday/pad2` | SWR-DUE-02 |
 | Router | 3タブ切替と再描画 | `state.screen`, `render()`, `setActiveTab()`, `el()` | SWR-CORE-01 |
 | DueView | 期日の横断集約・絞り込み・色分け | `renderDue()`, `itemTitle()` | SWR-DUE-01,03,04,05 |
 | LedgerView | カテゴリ一覧・記録一覧・記録編集 | `renderLedger()`, `renderCategoryItems()`, `renderItemEdit()` | SWR-LEDGER-01〜04 |
 | AiIntake | 音声/テキスト/画像からの下書き生成・反映 | `renderAiPanel(cat,item)`, `applyDraft()`, `requestExtract(payload)` | SWR-AI-01〜06,08 |
+| JournalView（Rev3） | 日記の記録・編集・削除、俯瞰タイムライン、タグ/期間絞り込み | `renderJournal()`, `renderJournalEdit()`, `buildTimeline()`, `parseTags()`, `relDayLabel()` | SWR-JOURNAL-01〜03, SWR-TL-01〜03 |
 | SettingsView | カテゴリ管理・Worker URL・JSON入出力・全消去・注意書き | `renderSettings()`, `addCategoryFlow()`, `exportData()` | SWR-CAT-03, SWR-DATA-02,03, SWR-AI-08, SWR-GUARD-01 |
 | RelayWorker（別デプロイ） | キー秘匿・Gemini代理（テキスト/画像） | `03_implementation/worker/index.js` | SWR-AI-07 / SYR-N8 |
 

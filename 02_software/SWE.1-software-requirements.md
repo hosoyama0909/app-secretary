@@ -37,9 +37,10 @@
 
 | ID | ソフトウェア要求 | 由来(SYR) |
 |----|------------------|-----------|
-| SWR-DATA-01 | categories/items/settings を localStorage に保存し、reload後も保持する | SYR-N2 |
-| SWR-DATA-02 | データを JSON ファイルに書き出せる（ファイル名に日付付与）。取り込むと categories/items を復元する | SYR-09 |
-| SWR-DATA-03 | 全データを消去し、カテゴリをプリセットへ初期化できる | SYR-10 |
+| SWR-DATA-01 | categories/items/settings/journal を localStorage に保存し、reload後も保持する | SYR-N2 |
+| SWR-DATA-02 | データを JSON ファイルに書き出せる（ファイル名に日付付与）。取り込むと categories/items/journal を復元する | SYR-09 |
+| SWR-DATA-03 | 全データ（items/journal 含む）を消去し、カテゴリをプリセットへ初期化できる | SYR-10 |
+| SWR-DATA-04 | 旧データ（journal 無し）読込時に空配列で補完する（後方互換） | SYR-N2 |
 
 ## AI下書き入力（Rev 2）— SYR-24, N7〜N9 由来
 
@@ -53,6 +54,17 @@
 | SWR-AI-06 | 抽出結果は下書きとしてフォームに反映するのみで、保存は人の操作に委ねる（自動保存しない値の確定は人） | SYR-24 |
 | SWR-AI-07 | Worker は GEMINI_API_KEY を secret 保持し、CORS付きで、テキスト(extract)と画像(extract-image)の両方を Gemini に代理呼び出しする | SYR-N8 |
 | SWR-AI-08 | Worker URL は設定画面で登録・保存でき、未設定時は AIパネルに設定導線を出す。通信失敗時はエラー表示のみで台帳・期日は動作を継続する | SYR-N8,N9 |
+
+## 日記・俯瞰タイムライン（Rev 3）— SYR-25,26,27 由来
+
+| ID | ソフトウェア要求 | 由来(SYR) |
+|----|------------------|-----------|
+| SWR-JOURNAL-01 | 日記エントリ {id, date, text, mood, tags[], categoryId?, createdAt} を作成し localStorage に保存する | SYR-25 |
+| SWR-JOURNAL-02 | クイック記録で 気分チップ・本文・タグ・関連カテゴリを入力でき、音声（Web Speech API）で本文に追記できる | SYR-25 |
+| SWR-JOURNAL-03 | エントリを開いて 日付・気分・本文・タグ・関連カテゴリを編集でき、削除できる | SYR-25 |
+| SWR-TL-01 | 日記タブで、日付降順の day-group タイムラインに、日記エントリと期日オカレンス（その日にかかる期日）を混在表示する（俯瞰） | SYR-26 |
+| SWR-TL-02 | 「今週／今月／すべて」で、過去(日記)・未来(期日)の表示幅（±7 / ±31 / ∞ 日）を切り替える | SYR-26,27 |
+| SWR-TL-03 | タグをタップして日記を絞り込める（絞り込み中は期日を隠し日記に集中する） | SYR-27 |
 
 ## 機微情報ガードレール — SYR-N10 由来
 

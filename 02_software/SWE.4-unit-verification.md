@@ -13,6 +13,8 @@ E2E（SWE.6）で検証する。現段階は PA1.1（実施）を満たす。
 | UTC-DUE-03 | computeNextDate | mode='interval', date=2026-01-01, N=6, today=2026-08-01 | 2027-01-01（基準からNヶ月刻みで今日以降の最初） | SWR-DUE-02 | ✅ 自動 |
 | UTC-DUE-04 | computeNextDate | date 未設定 | null（期日として扱わない） | SWR-DUE-02 | ✅ 設計上保証 |
 | UTC-CAT-01 | 起動時初期化 | localStorage 空で起動 | categories が17件になる | SWR-CAT-02 | ✅ E2E(QTC-LEDGER-01) |
+| UTC-JRN-01 | journal 後方互換 | journal 無しの旧データ読込 | journal=[] に補完しエラー無し | SWR-DATA-04 | ✅ 設計上保証 |
+| UTC-TL-01 | buildTimeline | 日記＋期日が範囲内 | day-group 降順で両kindを含む | SWR-TL-01 | ✅ E2E(QTC-TL-01) |
 
 ## レビュー観点（コードレビューチェックリスト）
 - [x] 期日算出が単発/毎年/nヶ月ごとで正しく、過去日を今日以降へ繰り上げるか（SWR-DUE-02）

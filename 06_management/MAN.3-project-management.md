@@ -14,7 +14,8 @@
 |-----|------|------|-----------|
 | Rev 1 | 汎用台帳（17ドメインプリセット）＋期日ダッシュボード＋設定/JSON入出力 | ✅ 完了 | index.html, SWR-CAT/LEDGER/DUE/DATA-* |
 | Rev 2 | AI下書き入力（音声/会話テキスト/写真OCR）＋中継Worker v2 | ✅ 完了 | worker/, SWR-AI-* |
-| Rev 3 | 家族間同期（Cloudflare Worker + KV/D1） | 予定 | — |
+| Rev 3 | 日記＋俯瞰タイムライン（記録・管理・整理） | ✅ 完了 | JournalView, SWR-JOURNAL/TL-* |
+| Rev 4 | 家族間同期（Worker+KV/D1）／日記の自動監視（カレンダー・Gmail連携） | 予定 | — |
 
 > 段階方針（構想ノート準拠）：Phase 1 単独 localStorage → Phase 2 JSONエクスポート/インポート
 > → Phase 3 同期（Rev 3）。現在は Phase 2。

@@ -111,12 +111,29 @@
   .top-actions .del{background:transparent; border:0; color:var(--danger); font-weight:700; font-size:.9rem; cursor:pointer}
 
   .guardrail{background:#fdf1f1; border:1px solid #f3c9c9; border-radius:12px; padding:12px 14px; font-size:.85rem; color:#7a1f1f; margin-bottom:14px}
+
+  /* 日記・俯瞰タイムライン */
+  .mood-row{display:flex; gap:8px; margin:8px 0}
+  .mood-row button{flex:1; min-height:44px; font-size:1.3rem; border:1px solid var(--line); background:#fff; border-radius:10px; cursor:pointer}
+  .mood-row button.active{background:#e7f3ec; border-color:var(--accent2)}
+  .tag-input-row{display:flex; gap:8px; align-items:center}
+  .day-group{margin-top:18px}
+  .day-head{font-weight:700; color:var(--sub); font-size:.9rem; padding:4px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between}
+  .tl-entry{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:8px; cursor:pointer}
+  .tl-entry .body{white-space:pre-wrap; word-break:break-word}
+  .tl-entry .sub{color:var(--sub); font-size:.8rem; margin-top:6px; display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .tl-due{display:flex; align-items:center; gap:10px; padding:10px 14px; margin-top:8px; border:1px dashed var(--line); border-radius:12px; color:var(--sub); font-size:.9rem; cursor:pointer}
+  .tag-pill{display:inline-block; background:#eef4ef; color:var(--accent2); border-radius:999px; padding:2px 10px; font-size:.78rem; font-weight:700}
+  .tag-pill.filter{cursor:pointer; border:1px solid var(--line); background:#fff}
+  .tag-pill.filter.active{background:var(--accent); color:#fff; border-color:var(--accent)}
+  .tagbar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px}
 </style>
 </head>
 <body>
   <div class="wrap" id="app"></div>
 
   <nav class="tabs">
+    <button data-screen="journal"><span class="ic">📔</span>日記</button>
     <button data-screen="due"><span class="ic">🔔</span>期日</button>
     <button data-screen="ledger"><span class="ic">🗂️</span>台帳</button>
     <button data-screen="settings"><span class="ic">⚙️</span>設定</button>
@@ -130,6 +147,10 @@
 var K_CATS = 'app-secretary:categories';
 var K_ITEMS = 'app-secretary:items';
 var K_SETTINGS = 'app-secretary:settings';
+var K_JOURNAL = 'app-secretary:journal';
+
+// 気分（任意）。日々の記録を俯瞰しやすくするための軽いラベル。
+var MOODS = ['😀','🙂','😐','😟','😫'];
 
 // ── プリセット17ドメイン ──
 // フィールド定義をデータとして持つ＝新ドメインは設定画面からカテゴリを足すだけで増やせる。
@@ -233,10 +254,13 @@ if(!categories){
 }
 var items = loadJSON(K_ITEMS, []);
 var settings = loadJSON(K_SETTINGS, {workerUrl:''});
+var journal = loadJSON(K_JOURNAL, []);
+if(!Array.isArray(journal)) journal = [];   // 後方互換（旧データに journal 無し）
 
 function persistCategories(){ saveJSON(K_CATS, categories); }
 function persistItems(){ saveJSON(K_ITEMS, items); }
 function persistSettings(){ saveJSON(K_SETTINGS, settings); }
+function persistJournal(){ saveJSON(K_JOURNAL, journal); }
 
 function getCategory(id){
   for(var i=0;i<categories.length;i++){ if(categories[i].id===id) return categories[i]; }
@@ -283,14 +307,16 @@ function daysBetween(a,b){
 }
 
 // ── 画面ルーティング ──
-var state = { screen:'due', filter:'3m', categoryId:null, itemId:null, editingCategoryId:null };
+// 既定は日記タブ＝日々の俯瞰を最初に見せるため（秘書の「今日の全体像」を入口にする）。
+var state = { screen:'journal', filter:'3m', categoryId:null, itemId:null, editingCategoryId:null,
+              journalFilter:'week', journalTag:null, journalId:null };
 
 var app = document.getElementById('app');
 var tabButtons = document.querySelectorAll('nav.tabs button');
 tabButtons.forEach(function(btn){
   btn.addEventListener('click', function(){
     state.screen = btn.getAttribute('data-screen');
-    state.categoryId = null; state.itemId = null;
+    state.categoryId = null; state.itemId = null; state.journalId = null;
     render();
   });
 });
@@ -320,7 +346,8 @@ function el(tag, attrs, children){
 function render(){
   setActiveTab();
   app.innerHTML = '';
-  if(state.screen === 'due') renderDue();
+  if(state.screen === 'journal') renderJournal();
+  else if(state.screen === 'due') renderDue();
   else if(state.screen === 'ledger') renderLedger();
   else if(state.screen === 'settings') renderSettings();
 }
@@ -639,6 +666,237 @@ function requestExtract(payload){
   });
 }
 
+// ── 📔 日記・俯瞰タイムライン ──
+// 日々の出来事（日記）と、その日にかかる期日を1つの時系列に混ぜて俯瞰する。
+// 記録(quick add)・管理(編集/削除)・整理(タグ絞り込み/期間) を1画面で回す。
+
+function parseTags(str){
+  return (str || '').split(/[,、\s]+/).map(function(s){ return s.trim(); })
+    .filter(function(s,i,a){ return s && a.indexOf(s)===i; });
+}
+
+function relDayLabel(d, today){
+  var n = daysBetween(today, d);
+  if(n === 0) return '今日';
+  if(n === 1) return '明日'; if(n === -1) return '昨日';
+  return n > 0 ? ('あと' + n + '日') : (Math.abs(n) + '日前');
+}
+
+function buildTimeline(){
+  var today = startOfToday();
+  var span = state.journalFilter === 'week' ? 7 : (state.journalFilter === 'month' ? 31 : Infinity);
+  var events = [];
+  journal.forEach(function(e){
+    if(state.journalTag && (e.tags||[]).indexOf(state.journalTag) < 0) return;
+    var d = parseISO(e.date);
+    if(Math.abs(daysBetween(today, d)) <= span) events.push({ kind:'diary', date:d, dateISO:e.date, entry:e });
+  });
+  // 期日は俯瞰の一部。ただしタグ絞り込み中は日記だけに集中させる。
+  if(!state.journalTag){
+    items.forEach(function(it){
+      var cat = getCategory(it.categoryId); if(!cat) return;
+      (it.dates||[]).forEach(function(de){
+        var next = computeNextDate(de, today); if(!next) return;
+        var diff = daysBetween(today, next);
+        if(diff >= 0 && diff <= span) events.push({ kind:'due', date:next, dateISO:toISO(next), cat:cat, item:it, de:de });
+      });
+    });
+  }
+  // 日付でグループ化し、未来→今日→過去（降順）で並べる＝上に「これから」下に「これまで」
+  var byDay = {};
+  events.forEach(function(ev){ (byDay[ev.dateISO] = byDay[ev.dateISO] || []).push(ev); });
+  var days = Object.keys(byDay).sort().reverse();
+  return { today: today, days: days, byDay: byDay };
+}
+
+function renderJournal(){
+  if(state.journalId){ renderJournalEdit(); return; }
+
+  app.appendChild(el('h1', {}, ['📔 日記']));
+  app.appendChild(el('p', {class:'lead'}, ['日々の出来事を書き留め、期日と一緒に俯瞰します。']));
+
+  // ── クイック記録 ──
+  var qa = el('div', {class:'card'});
+  var mood = { value:'' };
+  var moodRow = el('div', {class:'mood-row'});
+  MOODS.forEach(function(m){
+    var b = el('button', {type:'button'}, [m]);
+    b.addEventListener('click', function(){
+      if(mood.value === m){ mood.value = ''; } else { mood.value = m; }
+      Array.prototype.forEach.call(moodRow.children, function(c){ c.classList.toggle('active', c.textContent === mood.value); });
+    });
+    moodRow.appendChild(b);
+  });
+  qa.appendChild(el('label', {}, ['今日の記録']));
+  qa.appendChild(moodRow);
+
+  var textarea = el('textarea', {placeholder:'例）保育園の面談。車のタイヤ交換を予約した。'});
+  qa.appendChild(textarea);
+
+  // 音声でテキストに追記（Web Speech API・端末側・バックエンド不要）
+  var micBtn = el('button', {class:'btn secondary small', type:'button'}, ['🎤 音声で書く']);
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ micBtn.disabled = true; micBtn.title = 'このブラウザは音声入力に対応していません'; }
+  else {
+    micBtn.addEventListener('click', function(){
+      var rec = new SR(); rec.lang = 'ja-JP';
+      rec.onresult = function(ev){ var t = ev.results[0][0].transcript; textarea.value = (textarea.value ? textarea.value + ' ' : '') + t; };
+      rec.start();
+    });
+  }
+
+  var tagInput = el('input', {type:'text', placeholder:'タグ（カンマ区切り 例: 車, 予約）'});
+  qa.appendChild(el('label', {}, ['タグ（任意）']));
+  qa.appendChild(el('div', {class:'tag-input-row'}, [tagInput]));
+
+  // 関連カテゴリ（任意）— 日記を台帳のドメインに結びつけて整理しやすくする
+  var catSel = el('select');
+  catSel.appendChild(el('option', {value:''}, ['関連カテゴリ（任意）']));
+  categories.slice().sort(function(a,b){return a.order-b.order;}).forEach(function(c){
+    catSel.appendChild(el('option', {value:c.id}, [c.icon + ' ' + c.name]));
+  });
+  qa.appendChild(el('label', {}, ['関連カテゴリ（任意）']));
+  qa.appendChild(catSel);
+
+  qa.appendChild(el('button', {class:'btn', type:'button', onclick:function(){
+    if(!textarea.value.trim() && !mood.value){ return; }
+    journal.push({ id: uid(), date: toISO(new Date()), text: textarea.value.trim(),
+      mood: mood.value, tags: parseTags(tagInput.value), categoryId: catSel.value || '',
+      createdAt: new Date().toISOString() });
+    persistJournal();
+    render();
+  }}, ['記録する']));
+  app.appendChild(qa);
+
+  // ── 期間フィルタ ──
+  var filterbar = el('div', {class:'filterbar'});
+  [['week','今週'],['month','今月'],['all','すべて']].forEach(function(pair){
+    var b = el('button', {onclick:function(){ state.journalFilter = pair[0]; render(); }}, [pair[1]]);
+    if(state.journalFilter === pair[0]) b.classList.add('active');
+    filterbar.appendChild(b);
+  });
+  app.appendChild(filterbar);
+
+  // ── タグ絞り込みバー ──
+  var allTags = {};
+  journal.forEach(function(e){ (e.tags||[]).forEach(function(t){ allTags[t] = 1; }); });
+  var tagKeys = Object.keys(allTags);
+  if(tagKeys.length){
+    var tagbar = el('div', {class:'tagbar'});
+    if(state.journalTag){
+      tagbar.appendChild(el('button', {class:'tag-pill filter active', onclick:function(){ state.journalTag = null; render(); }}, ['✕ ' + state.journalTag]));
+    }
+    tagKeys.forEach(function(t){
+      if(t === state.journalTag) return;
+      tagbar.appendChild(el('button', {class:'tag-pill filter', onclick:function(){ state.journalTag = t; render(); }}, ['#' + t]));
+    });
+    app.appendChild(tagbar);
+  }
+
+  // ── 俯瞰タイムライン ──
+  var tl = buildTimeline();
+  if(tl.days.length === 0){
+    app.appendChild(el('div', {class:'card'}, [el('p', {class:'empty'}, ['まだ記録がありません。上のフォームから書き留めましょう。'])]));
+    return;
+  }
+  tl.days.forEach(function(dayISO){
+    var group = el('div', {class:'day-group'});
+    var d = parseISO(dayISO);
+    group.appendChild(el('div', {class:'day-head'}, [
+      el('span', {}, [dayISO]),
+      el('span', {}, [relDayLabel(d, tl.today)])
+    ]));
+    // 同じ日は「期日→日記」の順で
+    var evs = tl.byDay[dayISO].slice().sort(function(a,b){ return (a.kind==='due'?0:1) - (b.kind==='due'?0:1); });
+    evs.forEach(function(ev){
+      if(ev.kind === 'due'){
+        group.appendChild(el('div', {class:'tl-due', onclick:function(){
+          state.screen='ledger'; state.categoryId=ev.cat.id; state.itemId=ev.item.id; state.journalId=null; render();
+        }}, ['🔔 ' + ev.cat.icon + ' ' + itemTitle(ev.item, ev.cat) + ' ・ ' + ev.de.label]));
+      } else {
+        var e = ev.entry;
+        var sub = el('div', {class:'sub'});
+        if(e.categoryId){ var c = getCategory(e.categoryId); if(c) sub.appendChild(el('span', {}, [c.icon + ' ' + c.name])); }
+        (e.tags||[]).forEach(function(t){ sub.appendChild(el('span', {class:'tag-pill'}, ['#' + t])); });
+        group.appendChild(el('div', {class:'tl-entry', onclick:function(){ state.journalId = e.id; render(); }}, [
+          el('div', {class:'body'}, [(e.mood ? e.mood + ' ' : '') + (e.text || '（本文なし）')]),
+          sub
+        ]));
+      }
+    });
+    app.appendChild(group);
+  });
+}
+
+function renderJournalEdit(){
+  var e = journal.filter(function(x){ return x.id === state.journalId; })[0];
+  if(!e){ state.journalId = null; render(); return; }
+
+  app.appendChild(el('div', {class:'top-actions'}, [
+    el('button', {class:'back', onclick:function(){ state.journalId = null; render(); }}, ['← 日記']),
+    el('button', {class:'del', onclick:function(){
+      if(!confirm('この記録を削除しますか？')) return;
+      journal = journal.filter(function(x){ return x.id !== e.id; });
+      persistJournal(); state.journalId = null; render();
+    }}, ['削除']),
+  ]));
+  app.appendChild(el('h1', {}, ['📔 記録の編集']));
+
+  var card = el('div', {class:'card'});
+
+  card.appendChild(el('label', {}, ['日付']));
+  var dateInput = el('input', {type:'date'}); dateInput.value = e.date;
+  dateInput.addEventListener('input', function(){ e.date = dateInput.value; persistJournal(); });
+  card.appendChild(dateInput);
+
+  card.appendChild(el('label', {}, ['気分']));
+  var moodRow = el('div', {class:'mood-row'});
+  MOODS.forEach(function(m){
+    var b = el('button', {type:'button'}, [m]);
+    if(e.mood === m) b.classList.add('active');
+    b.addEventListener('click', function(){
+      e.mood = (e.mood === m ? '' : m); persistJournal();
+      Array.prototype.forEach.call(moodRow.children, function(c){ c.classList.toggle('active', c.textContent === e.mood); });
+    });
+    moodRow.appendChild(b);
+  });
+  card.appendChild(moodRow);
+
+  card.appendChild(el('label', {}, ['本文']));
+  var textarea = el('textarea'); textarea.value = e.text || '';
+  textarea.addEventListener('input', function(){ e.text = textarea.value; persistJournal(); });
+  card.appendChild(textarea);
+
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(SR){
+    var micBtn = el('button', {class:'btn secondary small', type:'button'}, ['🎤 音声で追記']);
+    micBtn.addEventListener('click', function(){
+      var rec = new SR(); rec.lang = 'ja-JP';
+      rec.onresult = function(ev){ var t = ev.results[0][0].transcript; textarea.value = (textarea.value ? textarea.value + ' ' : '') + t; e.text = textarea.value; persistJournal(); };
+      rec.start();
+    });
+    card.appendChild(micBtn);
+  }
+
+  card.appendChild(el('label', {}, ['タグ（カンマ区切り）']));
+  var tagInput = el('input', {type:'text'}); tagInput.value = (e.tags||[]).join(', ');
+  tagInput.addEventListener('input', function(){ e.tags = parseTags(tagInput.value); persistJournal(); });
+  card.appendChild(tagInput);
+
+  card.appendChild(el('label', {}, ['関連カテゴリ']));
+  var catSel = el('select');
+  catSel.appendChild(el('option', {value:''}, ['なし']));
+  categories.slice().sort(function(a,b){return a.order-b.order;}).forEach(function(c){
+    var o = el('option', {value:c.id}, [c.icon + ' ' + c.name]);
+    if(e.categoryId === c.id) o.selected = true;
+    catSel.appendChild(o);
+  });
+  catSel.addEventListener('change', function(){ e.categoryId = catSel.value; persistJournal(); });
+  card.appendChild(catSel);
+
+  app.appendChild(card);
+}
+
 // ── ⚙️ 設定 ──
 function renderSettings(){
   app.appendChild(el('h1', {}, ['⚙️ 設定']));
@@ -679,7 +937,8 @@ function renderSettings(){
         var data = JSON.parse(reader.result);
         if(data.categories) categories = data.categories;
         if(data.items) items = data.items;
-        persistCategories(); persistItems();
+        if(Array.isArray(data.journal)) journal = data.journal;
+        persistCategories(); persistItems(); persistJournal();
         alert('取り込みました。');
         render();
       }catch(e){ alert('JSONの読み込みに失敗しました。'); }
@@ -690,8 +949,8 @@ function renderSettings(){
   dataCard.appendChild(importInput);
   dataCard.appendChild(el('button', {class:'btn danger', type:'button', onclick:function(){
     if(!confirm('すべてのデータを消去します。よろしいですか？')) return;
-    items = []; categories = PRESET_CATEGORIES.map(function(c,i){ c.order=i; return c; });
-    persistItems(); persistCategories();
+    items = []; journal = []; categories = PRESET_CATEGORIES.map(function(c,i){ c.order=i; return c; });
+    persistItems(); persistJournal(); persistCategories();
     render();
   }}, ['全データを消去']));
   app.appendChild(dataCard);
@@ -711,7 +970,7 @@ function addCategoryFlow(){
 }
 
 function exportData(){
-  var data = { categories: categories, items: items, exportedAt: new Date().toISOString() };
+  var data = { categories: categories, items: items, journal: journal, exportedAt: new Date().toISOString() };
   var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
@@ -722,8 +981,8 @@ function exportData(){
 
 // ── expose for smoke test ──
 window.__secretaryApp = {
-  state: state, categories: categories, items: items, settings: settings,
-  computeNextDate: computeNextDate, render: render, getCategory: getCategory
+  state: state, categories: categories, items: items, settings: settings, journal: journal,
+  computeNextDate: computeNextDate, buildTimeline: buildTimeline, render: render, getCategory: getCategory
 };
 
 render();

@@ -116,6 +116,42 @@ worker/index.js（Cloudflare Worker）:
   APIキー: env.GEMINI_API_KEY（secret）。プロンプトはWorker側で組む
 ```
 
+## SWD-journal / SWD-timeline（JournalView, Rev 3）
+割当：SWR-JOURNAL-01〜03, SWR-TL-01〜03
+
+```
+buildTimeline():                               # 俯瞰タイムライン（SWR-TL-01,02,03）
+  today ← startOfToday()
+  span ← filter='week'?7 : 'month'?31 : ∞
+  events ← []
+  各 journal e:
+    if journalTag かつ e.tags に含まれない: skip     # タグ絞り込み(SWR-TL-03)
+    if |daysBetween(today, e.date)| ≤ span: events.push({kind:'diary', date, entry:e})
+  if journalTag 未設定:                              # 絞り込み中は期日を隠し日記に集中
+    各 item・各 date: next ← computeNextDate(de,today)
+      if 0 ≤ daysBetween(today,next) ≤ span: events.push({kind:'due', date:next, ...})
+  byDay ← events を dateISO でグループ化
+  return { days: byDay のキーを昇順ソートして反転(降順), byDay }   # 未来→今日→過去
+
+renderJournal():
+  クイック記録カード: 気分チップ(MOODS 5段, ローカル変数で選択・直接class切替)
+                     本文 textarea ＋ 🎤音声(SpeechRecognition→追記)
+                     タグ input(parseTags: 区切り[, 、 空白]→重複除去)
+                     関連カテゴリ select(任意)
+    「記録する」→ journal.push({id,date:今日,text,mood,tags,categoryId}); persistJournal(); render()
+  期間フィルタ(今週/今月/すべて) → state.journalFilter
+  タグバー: journal 内の全タグをチップ表示。タップで state.journalTag セット/解除
+  タイムライン: buildTimeline() の days(降順)ごとに day-head(日付＋相対ラベル)＋
+    その日の events を「期日→日記」順に描画。
+    期日行タップ→当該itemの編集へ。日記行タップ→renderJournalEdit(state.journalId=e.id)
+
+renderJournalEdit(): 日付/気分/本文(＋音声追記)/タグ/関連カテゴリを編集し都度 persistJournal()。削除可
+```
+**設計意図**：日記（過去・回顧）と期日（未来・予定）を today を中心に1軸へ載せ、降順で
+「上=これから／下=これまで」を1画面で俯瞰させる（SWR-TL-01）。クイック記録は render を挟まず
+ローカル変数＋直接DOM操作で気分/本文を保持し、保存忘れ・入力消失を防ぐ。
+既定タブを日記にして「今日の全体像」を入口にする（設計判断：秘書＝日々の俯瞰）。
+
 ## SWD-dataIO（SettingsView）
 割当：SWR-DATA-02,03 / SWR-CAT-03 / SWR-GUARD-01
 
@@ -134,7 +170,8 @@ Category : { id, name, icon, order:int, dateHints:[string], fields:[Field] }
 Field    : { key, label, type:'text'|'number'|'date'|'select', unit?, options?:[string] }
 Item     : { id, categoryId, values:{[key]:string}, dates:[DateEntry], memo:string, createdAt }
 DateEntry: { label, mode:'once'|'yearly'|'interval', date:'YYYY-MM-DD', intervalMonths:int, leadDays:int }
-settings : { workerUrl:string }   localStorage keys: app-secretary:{categories,items,settings}
+Journal  : { id, date:'YYYY-MM-DD', text:string, mood:''|MOODS, tags:[string], categoryId:string, createdAt }
+settings : { workerUrl:string }   localStorage keys: app-secretary:{categories,items,settings,journal}
 ```
 
 ## 実装位置（コードへのポインタ）
@@ -146,6 +183,7 @@ settings : { workerUrl:string }   localStorage keys: app-secretary:{categories,i
 | 期日ダッシュボード | `function renderDue()` / `itemTitle()` |
 | 台帳（一覧・編集） | `renderLedger` / `renderCategoryItems` / `renderItemEdit` |
 | AI下書き | `renderAiPanel` / `applyDraft` / `requestExtract` |
+| 日記・俯瞰タイムライン | `renderJournal` / `renderJournalEdit` / `buildTimeline` / `parseTags` / `relDayLabel` |
 | 設定・入出力 | `renderSettings` / `addCategoryFlow` / `exportData` |
 | Worker（別デプロイ） | `03_implementation/worker/index.js` |
 | テスト用フック | `window.__secretaryApp = {...}` |

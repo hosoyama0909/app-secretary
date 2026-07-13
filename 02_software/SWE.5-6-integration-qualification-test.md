@@ -25,17 +25,24 @@
 | QTC-AI-02 | 写真から下書き（画像fetchモック） | 反映後、localStorage に画像base64が残らない | SWR-AI-04 / SYR-N7 | ✅ Pass |
 | QTC-AI-03 | Worker応答を502失敗にする | クラッシュせず台帳・期日は動作継続、エラー表示のみ | SWR-AI-08 / SYR-N9 | ✅ Pass |
 | QTC-GUARD-01 | 設定タブ表示 | 🔴機微情報の注意書きが表示される | SWR-GUARD-01 / SYR-N10 | ✅ Pass |
+| QTC-JOURNAL-01 | 日記タブでクイック記録（本文＋タグ） | エントリが作成・保存される | SWR-JOURNAL-01,02 | ✅ Pass |
+| QTC-JOURNAL-02 | エントリを開いて本文編集 | text が更新・保持される | SWR-JOURNAL-03 | ✅ Pass |
+| QTC-TL-01 | 俯瞰タイムライン表示 | 日記と同日の期日が混在表示される | SWR-TL-01 | ✅ Pass |
+| QTC-TL-02 | タグで絞り込み | 日記のみに絞られ期日が隠れる | SWR-TL-03 | ✅ Pass |
+| QTC-DATA-02 | エクスポート内容＋リロード | JSONに journal を含み、reload後も保持 | SWR-DATA-01,02 | ✅ Pass |
 | QTC-NO-ERRORS | 全操作中のコンソール/ページエラー | エラーが発生しない | 品質 | ✅ Pass |
 
 ## 実行記録
-Rev 1 + Rev 2（2026-07-13）
+Rev 1 + Rev 2 + Rev 3（2026-07-13）
 ```
 QTC-LEDGER-01 tiles=17 / QTC-LEDGER-02 values{maker,price} reload保持 /
 QTC-DUE-01 rows≥1 / QTC-DUE-02 yearly→翌年, interval 2026-01→2027-01 /
-QTC-CAT-01 categories=18 / QTC-DATA-01 download=true /
+QTC-CAT-01 categories=18 / QTC-DATA-01 download=true / QTC-DATA-02 export.journal=true reload保持 /
 QTC-AI-01 draft反映 / QTC-AI-02 画像localStorage無し / QTC-AI-03 502でも継続 /
+QTC-JOURNAL-01 entry=1 tags=面談/保育園 / QTC-JOURNAL-02 編集反映 /
+QTC-TL-01 日記=1 期日=1 混在 / QTC-TL-02 絞込で期日=0 /
 QTC-GUARD-01 注意書き表示 / QTC-NO-ERRORS errors=0
-→ 全件 Pass。コンソールエラー無し。
+→ 全20件 Pass。コンソールエラー無し。
 ```
 
 ## トレーサビリティ

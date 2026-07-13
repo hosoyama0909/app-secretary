@@ -47,6 +47,19 @@ A-SPICE の中核。**上流（なぜ）から下流（実装・テスト）ま�
 | STK-09 | SYR-N8 | SWR-AI-07 | RelayWorker | relayWorker | `worker/index.js`(secret/CORS) | 手動(curl) |
 | STK-06 | SYR-N8,N9 | SWR-AI-08 | AiIntake/SettingsView | aiIntake/dataIO | Worker URL設定・失敗時継続 | QTC-AI-03 |
 
+## 4.5 縦のトレース：日記・俯瞰タイムライン（Rev 3）
+
+| STK | SYR | SWR | SWA(コンポーネント) | SWD | 実装 | テスト |
+|-----|-----|-----|--------------------|-----|------|--------|
+| STK-10 | SYR-25 | SWR-JOURNAL-01 | JournalView | journal | `renderJournal()` push | QTC-JOURNAL-01 |
+| STK-10 | SYR-25 | SWR-JOURNAL-02 | JournalView | journal | 気分/本文/タグ/音声/カテゴリ | QTC-JOURNAL-01 |
+| STK-10 | SYR-25 | SWR-JOURNAL-03 | JournalView | journal | `renderJournalEdit()` 編集/削除 | QTC-JOURNAL-02 |
+| STK-10 | SYR-26 | SWR-TL-01 | JournalView | timeline | `buildTimeline()` 混在描画 | QTC-TL-01, UTC-TL-01 |
+| STK-10 | SYR-26,27 | SWR-TL-02 | JournalView | timeline | 期間フィルタ ±7/±31/∞ | QTC-TL-01 |
+| STK-10 | SYR-27 | SWR-TL-03 | JournalView | timeline | タグ絞り込み（期日を隠す） | QTC-TL-02 |
+| STK-07 | SYR-09 | SWR-DATA-02 | SettingsView | dataIO | export/import に journal | QTC-DATA-02 |
+| STK-08 | SYR-N2 | SWR-DATA-04 | DataStore | ledgerModel | journal 後方互換補完 | UTC-JRN-01 |
+
 ## 5. 横断（非機能）
 
 | SYR | SWR | 実装 | テスト |
@@ -56,9 +69,9 @@ A-SPICE の中核。**上流（なぜ）から下流（実装・テスト）ま�
 | 品質 | — | コンソールエラー無し | QTC-NO-ERRORS |
 
 ## 6. カバレッジ・サマリー
-- STK 9件中、Rev 1–2 で **STK-01〜06, STK-08, STK-09** をカバー。STK-07（家族同期）は Rev 3 で対応予定（当面 JSON 受け渡し=SWR-DATA-02 で部分達成）。
-- 全 SWR-CAT/LEDGER/DUE/DATA/AI/GUARD-* が **実装＋テストに到達**（孤立要求なし）。
-  ただし SWR-AI-01（音声・実機）／SWR-AI-07（Worker実疎通）は外部・実機依存のため手動確認。
+- STK 10件中、Rev 1–3 で **STK-01〜06, STK-08, STK-09, STK-10** をカバー。STK-07（家族同期）は Rev 4 で対応予定（当面 JSON 受け渡し=SWR-DATA-02 で部分達成）。
+- 全 SWR-CAT/LEDGER/DUE/DATA/AI/GUARD/JOURNAL/TL-* が **実装＋テストに到達**（孤立要求なし）。
+  ただし SWR-AI-01・SWR-JOURNAL-02の音声（実機マイク）／SWR-AI-07（Worker実疎通）は外部・実機依存のため手動確認。
 - 孤立コード（要求に紐づかない実装）＝なし。
 
 > 更新ルール：要求 or 実装を変えたら、必ずこの表の該当行を更新してから merge する（一貫性維持）。
