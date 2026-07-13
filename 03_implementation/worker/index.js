@@ -7,7 +7,7 @@
 // - 🔴機微情報（口座番号フル/暗証番号/カード番号/マイナンバー/パスワード）は
 //   抽出しないようプロンプトで明示する。
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-flash-lite-latest';
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
