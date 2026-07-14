@@ -19,6 +19,29 @@ export default {
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: CORS_HEADERS });
     }
+
+    // ── ブラウザで開くだけの自己診断（GET）──
+    // /            … 設定状態（モデル名・APIキーが入っているか）を表示
+    // /?selftest=1 … 実際に Gemini を1回叩き、生の応答/エラーをそのまま表示
+    if (request.method === 'GET') {
+      const url = new URL(request.url);
+      const hasKey = !!env.GEMINI_API_KEY;
+      if (url.searchParams.get('selftest') !== '1') {
+        return json({ ok: true, model: GEMINI_MODEL, hasKey,
+          hint: hasKey ? 'URLの末尾に ?selftest=1 を付けて開くと、Geminiを実際に叩いて結果を表示します。'
+                       : '⚠️ GEMINI_API_KEY が未設定です。Cloudflareの Settings→Variables and Secrets で登録してください。' }, 200);
+      }
+      if (!hasKey) return json({ selftest: 'FAIL', reason: 'GEMINI_API_KEY が未設定です。' }, 200);
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'ping。「pong」とだけ返して。' }] }] }) }
+      );
+      const body = await r.text();
+      return json({ selftest: r.ok ? 'OK' : 'FAIL', model: GEMINI_MODEL,
+        geminiStatus: r.status, geminiBody: body.slice(0, 800) }, 200);
+    }
+
     if (request.method !== 'POST') {
       return json({ error: 'POST のみ対応しています。' }, 405);
     }
